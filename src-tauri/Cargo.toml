@@ -1,0 +1,42 @@
+[package]
+name = "devblitz"
+version = "0.1.0"
+description = "DevBlitz - AI-Powered Code IDE"
+authors = ["DevBlitz Team"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+name = "devblitz_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+tauri-plugin-dialog = "2.0"
+tauri-plugin-fs = "2.0"
+tauri-plugin-os = "2.0"
+tauri-plugin-shell = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+walkdir = "2.5"
+tokio = { version = "1.40", features = ["full"] }
+dirs = "5.0"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+

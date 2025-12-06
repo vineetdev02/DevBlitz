@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DevBlitz - Vercel-Inspired Dark Theme */
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 8%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 0% 80%;
+    --radius: 0.5rem;
+
+    /* Custom DevBlitz variables */
+    --sidebar-width: 250px;
+    --titlebar-height: 40px;
+    --statusbar-height: 24px;
+    
+    /* Glass morphism */
+    --glass-bg: rgba(10, 10, 10, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Disable text selection for UI elements */
+  .no-select {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Hide scrollbar for specific elements */
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  /* Glass morphism card */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  /* Hover glow effect */
+  .hover-glow {
+    transition: box-shadow 0.3s ease;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* DevBlitz logo shimmer */
+  .logo-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0.1) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* File tree item */
+  .file-tree-item {
+    @apply flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer;
+    @apply transition-colors duration-150;
+    @apply hover:bg-accent;
+  }
+
+  .file-tree-item.selected {
+    @apply bg-accent;
+  }
+
+  .file-tree-item.focused {
+    @apply ring-1 ring-ring ring-offset-1 ring-offset-background;
+  }
+
+  /* Titlebar buttons */
+  .titlebar-button {
+    @apply flex items-center justify-center w-10 h-full;
+    @apply transition-colors duration-150;
+    @apply hover:bg-accent;
+  }
+
+  .titlebar-button.close:hover {
+    @apply bg-red-600;
+  }
+
+  /* Keyboard shortcut badge */
+  .kbd {
+    @apply inline-flex items-center justify-center;
+    @apply px-1.5 py-0.5 text-[10px] font-medium;
+    @apply bg-muted text-muted-foreground;
+    @apply rounded border border-border;
+    font-family: var(--font-mono);
+  }
+
+  /* Action card (welcome screen) */
+  .action-card {
+    @apply relative overflow-hidden rounded-lg;
+    @apply bg-card border border-border;
+    @apply p-4 cursor-pointer;
+    @apply transition-all duration-200;
+    @apply hover:border-muted-foreground/50 hover:bg-accent;
+  }
+
+  .action-card:disabled,
+  .action-card.disabled {
+    @apply opacity-50 cursor-not-allowed;
+    @apply hover:border-border hover:bg-card;
+  }
+
+  /* Focus visible */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+@layer utilities {
+  /* Animation delays */
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  /* Drag region for titlebar */
+  .drag-region {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  /* Truncate text */
+  .truncate-path {
+    direction: rtl;
+    text-align: left;
+  }
+
+  .truncate-path::after {
+    content: '\200E';
+  }
+}
+
+/* Font face for Geist (optional - will fallback to Inter) */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+

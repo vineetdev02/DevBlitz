@@ -1,0 +1,269 @@
+# ============================================
+# DevBlitz - AI Code IDE
+# Comprehensive .gitignore
+# ============================================
+
+# ============================================
+# Node.js / Next.js
+# ============================================
+node_modules/
+.pnp/
+.pnp.js
+.pnp.cjs
+.yarn/install-state.gz
+
+# Next.js build outputs
+.next/
+out/
+build/
+dist/
+
+# Next.js cache
+.swc/
+
+# Package manager locks (keep package-lock.json)
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# ============================================
+# Tauri / Rust
+# ============================================
+# Rust build artifacts
+src-tauri/target/
+
+# Cargo lock (optional - can be committed for apps)
+# Uncomment if you want to ignore:
+# src-tauri/Cargo.lock
+
+# Tauri build tools
+src-tauri/WixTools/
+src-tauri/NSIS/
+
+# Generated Tauri bundles
+src-tauri/target/release/bundle/
+
+# Rust analyzer
+.cargo/
+
+# ============================================
+# IDE & Editors
+# ============================================
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Cursor
+.cursor/
+
+# Vim/Neovim
+*.swp
+*.swo
+*.swn
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ============================================
+# Operating System
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================
+# Environment & Secrets
+# ============================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# API keys and secrets
+*.pem
+*.key
+*.crt
+*.p12
+secrets.json
+credentials.json
+
+# ============================================
+# Testing & Coverage
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+htmlcov/
+jest-results/
+test-results/
+playwright-report/
+test-results.xml
+
+# ============================================
+# Logs & Debug
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Rust logs
+*.log.gz
+
+# Debug files
+debug/
+*.dmp
+
+# ============================================
+# TypeScript
+# ============================================
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Generated type declarations (if any)
+*.d.ts.map
+
+# ============================================
+# Build Artifacts
+# ============================================
+# Compiled binary addons
+*.node
+
+# WebAssembly
+*.wasm
+
+# Source maps (optional - uncomment if not needed)
+# *.map
+# *.js.map
+
+# ============================================
+# Tauri Specific
+# ============================================
+# Generated icons (if using tauricon)
+# Uncomment if you regenerate icons each build:
+# src-tauri/icons/*.png
+# src-tauri/icons/*.ico
+# src-tauri/icons/*.icns
+
+# Tauri updater signatures
+*.sig
+
+# ============================================
+# Monaco Editor (future)
+# ============================================
+# Monaco editor workers (bundled at build time)
+monaco-editor/
+
+# ============================================
+# Temporary Files
+# ============================================
+tmp/
+temp/
+.tmp/
+.temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ============================================
+# Project Specific
+# ============================================
+# DevBlitz app data (local development)
+.devblitz/
+
+# User settings/preferences
+user-settings.json
+workspace.json
+
+# Local development overrides
+*.local.ts
+*.local.tsx
+*.local.js
+*.local.json
+
+# ============================================
+# Documentation (optional)
+# ============================================
+# Uncomment if docs are generated:
+# docs/_build/
+# site/
+
+# ============================================
+# Misc
+# ============================================
+# Vercel
+.vercel/
+
+# Netlify
+.netlify/
+
+# Storybook
+storybook-static/
+
+# Turborepo
+.turbo/
+
+# ESLint cache
+.eslintcache
+
+# Prettier cache
+.prettiercache
+
+# Stylelint cache
+.stylelintcache
+
+# Parcel cache
+.parcel-cache/
+
+# Vite cache
+.vite/
+
+# ============================================
+# Keep these files (negation rules)
+# ============================================
+# Keep the icon file we created
+!src-tauri/icons/icon.png
