@@ -1,29 +1,93 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { FileCode2, MousePointer2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout';
+import { EditorTabs, CodeEditor } from '@/components/editor';
+import { TerminalPanel } from '@/components/terminal';
+import { SettingsPanel } from '@/components/settings';
 import { useCurrentProject } from '@/stores/projectStore';
-import { useProject, useGlobalShortcuts } from '@/hooks';
+import { useProject } from '@/hooks';
 import { useAppStore } from '@/stores/appStore';
+import { useTerminalStore } from '@/stores/terminalStore';
+import { useEditorStore } from '@/stores/editorStore';
 
-/**
- * Main IDE page
- * Shows the editor interface when a project is open
- */
 export default function IDEPage() {
   const router = useRouter();
   const currentProject = useCurrentProject();
-  const { openProject, closeProject } = useProject();
+  const { openProject } = useProject();
   const { toggleSidebar } = useAppStore();
+  const { toggleTerminal, isTerminalOpen, createTerminal, terminals } = useTerminalStore();
+  const { createNewFile } = useEditorStore();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Register global keyboard shortcuts
-  useGlobalShortcuts({
-    onOpenFolder: openProject,
-    onToggleSidebar: toggleSidebar,
-  });
+  // Handle terminal toggle
+  const handleToggleTerminal = useCallback(() => {
+    if (!isTerminalOpen && terminals.length === 0 && currentProject?.path) {
+      createTerminal(currentProject.path);
+    }
+    toggleTerminal();
+  }, [isTerminalOpen, terminals.length, currentProject?.path, createTerminal, toggleTerminal]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs (except for specific ones)
+      const target = e.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      
+      // Ctrl+` or Ctrl+Backquote - Toggle terminal
+      if (e.ctrlKey && (e.key === '`' || e.code === 'Backquote')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleToggleTerminal();
+        return;
+      }
+      
+      // Skip other shortcuts if in input field
+      if (isInputField) return;
+      
+      // Ctrl+N - Create new file
+      if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        createNewFile();
+        return;
+      }
+      
+      // Ctrl+B - Toggle sidebar
+      if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+        return;
+      }
+      
+      // Ctrl+O - Open folder
+      if (e.ctrlKey && e.key === 'o') {
+        e.preventDefault();
+        openProject();
+        return;
+      }
+
+      // Ctrl+, - Open settings
+      if (e.ctrlKey && e.key === ',') {
+        e.preventDefault();
+        setIsSettingsOpen(true);
+        return;
+      }
+
+      // Escape - Close settings/modals
+      if (e.key === 'Escape') {
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+        }
+        return;
+      }
+    };
+
+    // Use capture phase to ensure we catch the event first
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [handleToggleTerminal, toggleSidebar, openProject, isSettingsOpen, createNewFile]);
 
   // Redirect to home if no project is open
   useEffect(() => {
@@ -32,44 +96,28 @@ export default function IDEPage() {
     }
   }, [currentProject, router]);
 
-  // Don't render if no project
   if (!currentProject) {
     return null;
   }
 
   return (
-    <AppLayout>
-      {/* Editor placeholder */}
-      <div className="flex-1 flex items-center justify-center bg-background">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="text-center max-w-md"
-        >
-          {/* Icon */}
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent mb-6">
-            <FileCode2 className="w-8 h-8 text-muted-foreground" />
+    <>
+      <AppLayout onOpenSettings={() => setIsSettingsOpen(true)}>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <EditorTabs />
+            <div className="flex-1 overflow-hidden">
+              <CodeEditor />
+            </div>
           </div>
+          <TerminalPanel />
+        </div>
+      </AppLayout>
 
-          {/* Title */}
-          <h2 className="text-lg font-semibold mb-2">
-            No File Selected
-          </h2>
-
-          {/* Description */}
-          <p className="text-sm text-muted-foreground mb-6">
-            Select a file from the explorer to start editing
-          </p>
-
-          {/* Hint */}
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/60">
-            <MousePointer2 className="w-3.5 h-3.5" />
-            <span>Click on a file in the sidebar</span>
-          </div>
-        </motion.div>
-      </div>
-    </AppLayout>
+      <SettingsPanel 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+      />
+    </>
   );
 }
-

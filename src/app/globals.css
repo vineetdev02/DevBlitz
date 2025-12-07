@@ -46,13 +46,21 @@
 
   html {
     color-scheme: dark;
+    background-color: #000000;
   }
 
   body {
     @apply bg-background text-foreground;
+    background-color: #000000;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Prevent white flash on load */
+  #__next {
+    background-color: #000000;
+    min-height: 100vh;
   }
 
   /* Disable text selection for UI elements */
@@ -86,6 +94,21 @@
   }
 
   .scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Thin scrollbar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
@@ -258,4 +281,5 @@
   font-style: normal;
   font-display: swap;
 }
+
 

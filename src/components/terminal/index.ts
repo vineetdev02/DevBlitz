@@ -1,0 +1,2 @@
+export { TerminalPanel } from './Terminal';
+

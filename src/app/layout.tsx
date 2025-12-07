@@ -25,8 +25,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="en" className="dark" style={{ backgroundColor: '#000000' }}>
+      <body 
+        className={`${inter.variable} font-sans antialiased`}
+        style={{ backgroundColor: '#000000', color: '#fafafa' }}
+      >
         <div className="min-h-screen bg-background text-foreground">
           {children}
         </div>

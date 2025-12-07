@@ -3,19 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { readDirectory } from '@/lib/tauri-commands';
-import { isTauri } from '@/lib/utils';
 import type { FileItem, FileTreeNode } from '@/types';
-
-/**
- * Mock file tree for development outside Tauri
- */
-const MOCK_FILES: FileItem[] = [
-  { name: 'src', path: '/mock/src', isDirectory: true, isHidden: false, extension: null, size: null, childrenCount: 5 },
-  { name: 'public', path: '/mock/public', isDirectory: true, isHidden: false, extension: null, size: null, childrenCount: 2 },
-  { name: 'package.json', path: '/mock/package.json', isDirectory: false, isHidden: false, extension: 'json', size: 1024, childrenCount: null },
-  { name: 'README.md', path: '/mock/README.md', isDirectory: false, isHidden: false, extension: 'md', size: 2048, childrenCount: null },
-  { name: '.gitignore', path: '/mock/.gitignore', isDirectory: true, isHidden: true, extension: null, size: 256, childrenCount: null },
-];
 
 /**
  * Convert FileItem array to FileTreeNode array
@@ -28,6 +16,28 @@ function toTreeNodes(items: FileItem[], depth: number): FileTreeNode[] {
     isExpanded: false,
     isLoading: false,
   }));
+}
+
+/**
+ * Recursively update a node in the tree
+ */
+function updateTreeNode(
+  nodes: FileTreeNode[],
+  targetPath: string,
+  updater: (node: FileTreeNode) => FileTreeNode
+): FileTreeNode[] {
+  return nodes.map((node) => {
+    if (node.path === targetPath) {
+      return updater(node);
+    }
+    if (node.children) {
+      return {
+        ...node,
+        children: updateTreeNode(node.children, targetPath, updater),
+      };
+    }
+    return node;
+  });
 }
 
 /**
@@ -61,26 +71,23 @@ export function useFileSystem() {
     setLoadingTree(true);
 
     try {
-      let items: FileItem[];
-
-      if (!isTauri()) {
-        // Use mock data outside Tauri
-        items = MOCK_FILES;
-      } else {
-        items = await readDirectory(currentProject.path, currentProject.path);
-      }
+      const items = await readDirectory(currentProject.path, currentProject.path);
 
       // Filter hidden files if setting is disabled
+      let filteredItems = items;
       if (!settings.showHiddenFiles) {
-        items = items.filter((item) => !item.isHidden);
+        filteredItems = items.filter((item) => !item.isHidden);
       }
 
-      const tree = toTreeNodes(items, 0);
+      const tree = toTreeNodes(filteredItems, 0);
       setFileTree(tree);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load files';
+      console.error('Failed to load project files:', err);
       setError(message);
       setFileTree([]);
+    } finally {
+      setLoadingTree(false);
     }
   }, [currentProject?.path, settings.showHiddenFiles, setFileTree, setLoadingTree, setError]);
 
@@ -91,24 +98,15 @@ export function useFileSystem() {
     if (!currentProject?.path) return [];
 
     try {
-      let items: FileItem[];
-
-      if (!isTauri()) {
-        // Mock nested files
-        items = [
-          { name: 'index.ts', path: `${dirPath}/index.ts`, isDirectory: false, isHidden: false, extension: 'ts', size: 512, childrenCount: null },
-          { name: 'utils', path: `${dirPath}/utils`, isDirectory: true, isHidden: false, extension: null, size: null, childrenCount: 3 },
-        ];
-      } else {
-        items = await readDirectory(dirPath, currentProject.path);
-      }
+      const items = await readDirectory(dirPath, currentProject.path);
 
       // Filter hidden files
+      let filteredItems = items;
       if (!settings.showHiddenFiles) {
-        items = items.filter((item) => !item.isHidden);
+        filteredItems = items.filter((item) => !item.isHidden);
       }
 
-      return toTreeNodes(items, depth);
+      return toTreeNodes(filteredItems, depth);
     } catch (err) {
       console.error('Failed to load directory:', err);
       return [];
@@ -127,19 +125,23 @@ export function useFileSystem() {
       // Collapse
       toggleExpanded(node.path);
     } else {
-      // Expand and load children if not already loaded
+      // Expand and load children
       setLoadingPaths((prev) => new Set(prev).add(node.path));
+
+      // Mark as loading in tree
+      setFileTree(
+        updateTreeNode(fileTree, node.path, (n) => ({ ...n, isLoading: true }))
+      );
 
       const children = await loadDirectoryChildren(node.path, node.depth + 1);
 
-      // Update the tree with children
+      // Update the tree with children recursively
       setFileTree(
-        fileTree.map((item) => {
-          if (item.path === node.path) {
-            return { ...item, children, isLoading: false };
-          }
-          return item;
-        })
+        updateTreeNode(fileTree, node.path, (n) => ({
+          ...n,
+          children,
+          isLoading: false,
+        }))
       );
 
       toggleExpanded(node.path);
@@ -176,4 +178,3 @@ export function useFileSystem() {
     isPathLoading,
   };
 }
-

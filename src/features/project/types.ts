@@ -23,3 +23,4 @@ export interface ProjectStatistics {
   fileTypes: Record<string, number>;
 }
 
+

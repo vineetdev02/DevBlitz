@@ -115,7 +115,8 @@ export function getRelativeTime(date: Date | string): string {
  * Check if running in Tauri environment
  */
 export function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window;
+  if (typeof window === 'undefined') return false;
+  return '__TAURI__' in window || '__TAURI_INTERNALS__' in window;
 }
 
 /**
@@ -137,4 +138,5 @@ export function getPlatform(): 'mac' | 'windows' | 'linux' | 'unknown' {
 export function getModifierKey(): string {
   return getPlatform() === 'mac' ? '⌘' : 'Ctrl';
 }
+
 

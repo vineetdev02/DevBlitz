@@ -1,21 +1,18 @@
 'use client';
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFileSystem } from '@/hooks/useFileSystem';
 import { useCurrentProject, useProjectStore } from '@/stores/projectStore';
 import { FileNode } from './FileNode';
 import type { FileTreeNode } from '@/types';
 
-/**
- * File tree explorer component
- * Renders recursive file/folder structure
- */
 export function FileTree() {
   const currentProject = useCurrentProject();
   const { isLoadingTree } = useProjectStore();
+  const [isProjectExpanded, setIsProjectExpanded] = useState(true);
   const {
     fileTree,
     expandedPaths,
@@ -25,137 +22,133 @@ export function FileTree() {
     selectItem,
   } = useFileSystem();
 
-  // Load files when project changes
   useEffect(() => {
     if (currentProject?.path) {
       loadProjectFiles();
     }
   }, [currentProject?.path, loadProjectFiles]);
 
-  // Handle keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!selectedPath || fileTree.length === 0) return;
 
-    // Find current index
     const flatTree = flattenTree(fileTree, expandedPaths);
     const currentIndex = flatTree.findIndex((node) => node.path === selectedPath);
-    
     if (currentIndex === -1) return;
 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
         if (currentIndex < flatTree.length - 1) {
-          const nextNode = flatTree[currentIndex + 1];
-          if (nextNode) selectItem(nextNode.path);
+          selectItem(flatTree[currentIndex + 1].path);
         }
         break;
-        
       case 'ArrowUp':
         e.preventDefault();
         if (currentIndex > 0) {
-          const prevNode = flatTree[currentIndex - 1];
-          if (prevNode) selectItem(prevNode.path);
+          selectItem(flatTree[currentIndex - 1].path);
         }
         break;
-        
       case 'ArrowRight':
         e.preventDefault();
-        const currentNode = flatTree[currentIndex];
-        if (currentNode?.isDirectory && !expandedPaths.has(currentNode.path)) {
-          toggleDirectory(currentNode);
+        const node = flatTree[currentIndex];
+        if (node?.isDirectory && !expandedPaths.has(node.path)) {
+          toggleDirectory(node);
         }
         break;
-        
       case 'ArrowLeft':
         e.preventDefault();
-        const current = flatTree[currentIndex];
-        if (current?.isDirectory && expandedPaths.has(current.path)) {
-          toggleDirectory(current);
+        const curr = flatTree[currentIndex];
+        if (curr?.isDirectory && expandedPaths.has(curr.path)) {
+          toggleDirectory(curr);
         }
         break;
-        
       case 'Enter':
         e.preventDefault();
-        const selected = flatTree[currentIndex];
-        if (selected?.isDirectory) {
-          toggleDirectory(selected);
+        const sel = flatTree[currentIndex];
+        if (sel?.isDirectory) {
+          toggleDirectory(sel);
         }
         break;
     }
   }, [selectedPath, fileTree, expandedPaths, selectItem, toggleDirectory]);
 
-  // No project open
   if (!currentProject) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <p className="text-sm text-muted-foreground">
-          No folder opened
-        </p>
-        <p className="text-xs text-muted-foreground/60 mt-1">
-          Open a folder to start
-        </p>
+      <div className="flex flex-col items-center justify-center h-48 text-neutral-500">
+        <p className="text-sm">No folder open</p>
       </div>
     );
   }
 
-  // Loading state
   if (isLoadingTree) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <RefreshCw className="w-5 h-5 text-muted-foreground animate-spin" />
+      <div className="flex flex-col items-center justify-center h-32 gap-2">
+        <RefreshCw className="w-4 h-4 text-neutral-500 animate-spin" />
+        <p className="text-xs text-neutral-600">Loading...</p>
       </div>
     );
   }
 
-  // Empty project
   if (fileTree.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <p className="text-sm text-muted-foreground">
-          Empty folder
-        </p>
+      <div className="flex flex-col items-center justify-center h-48 text-neutral-500">
+        <p className="text-sm">Empty folder</p>
       </div>
     );
   }
 
   return (
     <div
-      className="py-2 outline-none"
+      className="outline-none select-none text-neutral-300"
       tabIndex={0}
       onKeyDown={handleKeyDown}
       role="tree"
-      aria-label="File Explorer"
     >
       {/* Project header */}
-      <div className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-foreground uppercase tracking-wider">
-        <ChevronDown className="w-4 h-4" />
+      <div
+        onClick={() => setIsProjectExpanded(!isProjectExpanded)}
+        className={cn(
+          'flex items-center h-[22px] px-2 cursor-pointer',
+          'text-[11px] font-semibold uppercase tracking-wide text-neutral-400',
+          'hover:bg-white/5'
+        )}
+      >
+        {isProjectExpanded ? (
+          <ChevronDown className="w-3 h-3 mr-1" />
+        ) : (
+          <ChevronRight className="w-3 h-3 mr-1" />
+        )}
         <span className="truncate">{currentProject.name}</span>
+        <span className="ml-auto text-[10px] text-neutral-600">{fileTree.length}</span>
       </div>
 
-      {/* File tree */}
-      <div className="mt-1">
-        <AnimatePresence initial={false}>
-          {fileTree.map((node) => (
-            <FileTreeNodeRecursive
-              key={node.path}
-              node={node}
-              expandedPaths={expandedPaths}
-              selectedPath={selectedPath}
-              onToggle={toggleDirectory}
-              onSelect={selectItem}
-            />
-          ))}
-        </AnimatePresence>
-      </div>
+      {/* Tree */}
+      <AnimatePresence initial={false}>
+        {isProjectExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.1 }}
+          >
+            {fileTree.map((node) => (
+              <TreeNode
+                key={node.path}
+                node={node}
+                expandedPaths={expandedPaths}
+                selectedPath={selectedPath}
+                onToggle={toggleDirectory}
+                onSelect={selectItem}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-/**
- * Recursive file tree node renderer
- */
-interface FileTreeNodeRecursiveProps {
+interface TreeNodeProps {
   node: FileTreeNode;
   expandedPaths: Set<string>;
   selectedPath: string | null;
@@ -163,23 +156,12 @@ interface FileTreeNodeRecursiveProps {
   onSelect: (path: string) => void;
 }
 
-function FileTreeNodeRecursive({
-  node,
-  expandedPaths,
-  selectedPath,
-  onToggle,
-  onSelect,
-}: FileTreeNodeRecursiveProps) {
+function TreeNode({ node, expandedPaths, selectedPath, onToggle, onSelect }: TreeNodeProps) {
   const isExpanded = expandedPaths.has(node.path);
   const isSelected = selectedPath === node.path;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ duration: 0.15 }}
-    >
+    <>
       <FileNode
         node={node}
         isExpanded={isExpanded}
@@ -188,42 +170,39 @@ function FileTreeNodeRecursive({
         onSelect={() => onSelect(node.path)}
       />
 
-      {/* Render children if expanded */}
       {node.isDirectory && isExpanded && node.children && (
         <AnimatePresence initial={false}>
           {node.children.map((child) => (
-            <FileTreeNodeRecursive
+            <motion.div
               key={child.path}
-              node={child}
-              expandedPaths={expandedPaths}
-              selectedPath={selectedPath}
-              onToggle={onToggle}
-              onSelect={onSelect}
-            />
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.05 }}
+            >
+              <TreeNode
+                node={child}
+                expandedPaths={expandedPaths}
+                selectedPath={selectedPath}
+                onToggle={onToggle}
+                onSelect={onSelect}
+              />
+            </motion.div>
           ))}
         </AnimatePresence>
       )}
-    </motion.div>
+    </>
   );
 }
 
-/**
- * Flatten tree for keyboard navigation
- */
-function flattenTree(
-  nodes: FileTreeNode[],
-  expandedPaths: Set<string>
-): FileTreeNode[] {
+function flattenTree(nodes: FileTreeNode[], expandedPaths: Set<string>): FileTreeNode[] {
   const result: FileTreeNode[] = [];
-  
   function traverse(node: FileTreeNode) {
     result.push(node);
     if (node.isDirectory && expandedPaths.has(node.path) && node.children) {
       node.children.forEach(traverse);
     }
   }
-  
   nodes.forEach(traverse);
   return result;
 }
-

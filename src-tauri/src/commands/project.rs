@@ -34,9 +34,10 @@ fn ensure_app_data_dir() -> Result<PathBuf, String> {
 /// # Returns
 /// The selected folder path, or None if cancelled
 #[tauri::command]
-pub async fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+pub fn select_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
     
+    // Use blocking_pick_folder for synchronous operation
     let result = app
         .dialog()
         .file()

@@ -103,3 +103,4 @@ export function filterHiddenFiles(items: FileItem[], showHidden: boolean): FileI
   return items.filter(item => !item.isHidden);
 }
 
+

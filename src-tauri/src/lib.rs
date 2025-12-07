@@ -5,7 +5,7 @@ mod commands;
 mod security;
 mod utils;
 
-use commands::{filesystem, project};
+use commands::{filesystem, project, terminal};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,8 +25,13 @@ pub fn run() {
             project::add_recent_project,
             project::remove_recent_project,
             project::validate_project_path,
+            // Terminal commands
+            terminal::execute_command,
+            terminal::get_username,
+            terminal::get_hostname,
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevBlitz");
 }
+
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import {
   ChevronRight,
   Folder,
@@ -19,8 +19,10 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { FILE_TREE_INDENT } from '@/lib/constants';
 import { FileContextMenu } from './ContextMenu';
+import { useEditorStore, getLanguageFromExtension } from '@/stores/editorStore';
+import { useCurrentProject } from '@/stores/projectStore';
+import { readFileContent } from '@/lib/tauri-commands';
 import type { FileTreeNode } from '@/types';
 
 interface FileNodeProps {
@@ -31,10 +33,6 @@ interface FileNodeProps {
   onSelect: () => void;
 }
 
-/**
- * Single file/folder node in the file tree
- * Memoized for performance with large trees
- */
 export const FileNode = memo(function FileNode({
   node,
   isExpanded,
@@ -42,8 +40,35 @@ export const FileNode = memo(function FileNode({
   onToggle,
   onSelect,
 }: FileNodeProps) {
-  const Icon = getFileIcon(node);
-  const indent = node.depth * FILE_TREE_INDENT;
+  const Icon = getFileIcon(node, isExpanded);
+  const iconColor = getIconColor(node);
+  const { openFile } = useEditorStore();
+  const currentProject = useCurrentProject();
+
+  // VS Code style indent: 8px base + 12px per level
+  const indent = 8 + node.depth * 12;
+
+  const handleOpenFile = useCallback(async () => {
+    if (node.isDirectory || !currentProject) return;
+
+    try {
+      const content = await readFileContent(node.path, currentProject.path);
+      openFile({
+        path: node.path,
+        name: node.name,
+        content: content || '',
+        language: getLanguageFromExtension(node.extension),
+      });
+    } catch (err) {
+      console.error('Failed to open file:', err);
+      openFile({
+        path: node.path,
+        name: node.name,
+        content: `// Error: ${err instanceof Error ? err.message : 'Failed to load'}`,
+        language: 'plaintext',
+      });
+    }
+  }, [node, currentProject, openFile]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -51,13 +76,9 @@ export const FileNode = memo(function FileNode({
     
     if (node.isDirectory) {
       onToggle();
+    } else {
+      handleOpenFile();
     }
-  };
-
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // TODO: Open file in editor
-    console.log('Open file:', node.path);
   };
 
   return (
@@ -67,22 +88,36 @@ export const FileNode = memo(function FileNode({
         aria-expanded={node.isDirectory ? isExpanded : undefined}
         aria-selected={isSelected}
         className={cn(
-          'file-tree-item group',
-          isSelected && 'selected bg-accent',
+          'relative flex items-center h-[22px] cursor-pointer',
+          'hover:bg-white/5 transition-colors duration-75',
+          'text-[13px] select-none',
+          isSelected && 'bg-white/10',
         )}
-        style={{ paddingLeft: `${indent + 8}px` }}
+        style={{ paddingLeft: `${indent}px` }}
         onClick={handleClick}
-        onDoubleClick={!node.isDirectory ? handleDoubleClick : undefined}
       >
-        {/* Expand/collapse arrow for directories */}
-        <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+        {/* Indent guide lines */}
+        {node.depth > 0 && (
+          <>
+            {Array.from({ length: node.depth }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute top-0 bottom-0 w-px bg-neutral-800"
+                style={{ left: `${16 + i * 12}px` }}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Chevron for directories */}
+        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 mr-0.5">
           {node.isDirectory && (
             node.isLoading ? (
-              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+              <Loader2 className="w-3 h-3 animate-spin text-neutral-500" />
             ) : (
               <ChevronRight
                 className={cn(
-                  'w-3 h-3 text-muted-foreground transition-transform duration-150',
+                  'w-3 h-3 text-neutral-500 transition-transform duration-100',
                   isExpanded && 'rotate-90'
                 )}
               />
@@ -90,106 +125,68 @@ export const FileNode = memo(function FileNode({
           )}
         </span>
 
-        {/* File/folder icon */}
-        <span className="flex-shrink-0">
-          <Icon
-            className={cn(
-              'w-4 h-4',
-              node.isDirectory
-                ? 'text-yellow-500'
-                : 'text-muted-foreground'
-            )}
-          />
-        </span>
+        {/* Icon */}
+        <Icon className={cn('w-4 h-4 mr-1.5 flex-shrink-0', iconColor)} />
 
-        {/* File name */}
-        <span
-          className={cn(
-            'flex-1 truncate text-sm',
-            node.isHidden && 'opacity-60'
-          )}
-        >
+        {/* Name */}
+        <span className={cn('truncate', node.isHidden && 'opacity-50')}>
           {node.name}
         </span>
-
-        {/* Children count for directories */}
-        {node.isDirectory && node.childrenCount !== null && node.childrenCount > 0 && (
-          <span className="text-[10px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
-            {node.childrenCount}
-          </span>
-        )}
       </div>
     </FileContextMenu>
   );
 });
 
-/**
- * Get appropriate icon for file type
- */
-function getFileIcon(node: FileTreeNode): React.ComponentType<{ className?: string }> {
+function getFileIcon(node: FileTreeNode, isExpanded: boolean): React.ComponentType<{ className?: string }> {
   if (node.isDirectory) {
-    // Check for special folders
-    const folderName = node.name.toLowerCase();
-    
-    if (folderName === 'node_modules') return Package;
-    if (folderName === '.git') return GitBranch;
-    
-    return node.isExpanded ? FolderOpen : Folder;
+    const name = node.name.toLowerCase();
+    if (name === 'node_modules') return Package;
+    if (name === '.git') return GitBranch;
+    return isExpanded ? FolderOpen : Folder;
   }
 
-  // Get extension
   const ext = node.extension?.toLowerCase();
+  if (!ext) return File;
 
-  if (!ext) {
-    // Special files without extension
-    const fileName = node.name.toLowerCase();
-    if (fileName === 'dockerfile' || fileName === 'containerfile') return FileCode;
-    if (fileName === 'makefile') return Settings;
-    if (fileName.includes('license')) return FileText;
-    if (fileName.includes('readme')) return FileText;
-    return File;
-  }
-
-  // Code files
-  if (['js', 'jsx', 'ts', 'tsx', 'rs', 'py', 'rb', 'go', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'php', 'swift', 'kt', 'scala'].includes(ext)) {
-    return FileCode;
-  }
-
-  // Config files
-  if (['json', 'yaml', 'yml', 'toml', 'xml', 'ini', 'cfg', 'conf'].includes(ext)) {
-    return FileJson;
-  }
-
-  // Markup/docs
-  if (['md', 'markdown', 'txt', 'rst', 'html', 'htm'].includes(ext)) {
-    return FileText;
-  }
-
-  // Images
-  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp'].includes(ext)) {
-    return Image;
-  }
-
-  // Database
-  if (['sql', 'db', 'sqlite', 'sqlite3'].includes(ext)) {
-    return Database;
-  }
-
-  // Shell
-  if (['sh', 'bash', 'zsh', 'fish', 'ps1', 'bat', 'cmd'].includes(ext)) {
-    return Terminal;
-  }
-
-  // Font/style
-  if (['css', 'scss', 'sass', 'less'].includes(ext)) {
-    return FileType;
-  }
-
-  // Settings
-  if (['env', 'lock', 'gitignore', 'gitattributes', 'editorconfig', 'prettierrc', 'eslintrc'].includes(ext)) {
-    return Settings;
-  }
+  if (['js', 'jsx', 'ts', 'tsx', 'rs', 'py', 'rb', 'go', 'java', 'c', 'cpp', 'php'].includes(ext)) return FileCode;
+  if (['json', 'yaml', 'yml', 'toml', 'xml'].includes(ext)) return FileJson;
+  if (['md', 'txt', 'html', 'htm'].includes(ext)) return FileText;
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return Image;
+  if (['sql', 'db'].includes(ext)) return Database;
+  if (['sh', 'bash', 'zsh'].includes(ext)) return Terminal;
+  if (['css', 'scss', 'sass', 'less'].includes(ext)) return FileType;
+  if (['env', 'gitignore'].includes(ext)) return Settings;
 
   return File;
 }
 
+function getIconColor(node: FileTreeNode): string {
+  if (node.isDirectory) {
+    const name = node.name.toLowerCase();
+    if (name === 'node_modules') return 'text-green-500/70';
+    if (name === '.git') return 'text-orange-400';
+    return 'text-yellow-500';
+  }
+
+  const ext = node.extension?.toLowerCase();
+  if (!ext) return 'text-neutral-400';
+
+  const colors: Record<string, string> = {
+    js: 'text-yellow-400',
+    jsx: 'text-cyan-400',
+    ts: 'text-blue-400',
+    tsx: 'text-blue-400',
+    py: 'text-yellow-500',
+    rs: 'text-orange-400',
+    go: 'text-cyan-400',
+    java: 'text-red-400',
+    html: 'text-orange-400',
+    css: 'text-blue-400',
+    scss: 'text-pink-400',
+    json: 'text-yellow-500',
+    md: 'text-blue-300',
+    svg: 'text-orange-400',
+  };
+
+  return colors[ext] || 'text-neutral-400';
+}

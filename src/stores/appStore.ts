@@ -82,3 +82,4 @@ export const useWindowFocused = () => useAppStore((state) => state.isWindowFocus
 export const useIsMaximized = () => useAppStore((state) => state.isMaximized);
 export const useTheme = () => useAppStore((state) => state.theme);
 
+
