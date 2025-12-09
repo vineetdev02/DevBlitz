@@ -117,3 +117,5 @@ export const useActiveTerminal = () => {
 };
 export const useIsTerminalOpen = () => useTerminalStore((state) => state.isTerminalOpen);
 
+
+

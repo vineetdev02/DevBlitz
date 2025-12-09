@@ -83,3 +83,5 @@ export const useIsMaximized = () => useAppStore((state) => state.isMaximized);
 export const useTheme = () => useAppStore((state) => state.theme);
 
 
+
+

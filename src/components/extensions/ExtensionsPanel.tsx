@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useExtensionsStore, Extension } from '@/stores/extensionsStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ExtensionDetailView } from './ExtensionDetailView';
 
 const categories = ['All', 'Formatters', 'Linters', 'SCM', 'Programming Languages', 'Other'];
 
@@ -16,8 +17,10 @@ export function ExtensionsPanel() {
     searchQuery,
     selectedCategory,
     isLoading,
+    selectedExtensionId,
     setSearchQuery,
     setSelectedCategory,
+    setSelectedExtensionId,
     searchExtensions,
     installExtension,
     uninstallExtension,
@@ -26,15 +29,18 @@ export function ExtensionsPanel() {
     loadInstalledExtensions,
   } = useExtensionsStore();
 
-  const [activeTab, setActiveTab] = useState<'marketplace' | 'installed'>('marketplace');
+  const [activeTab, setActiveTab] = useState<'marketplace' | 'installed'>('installed');
+
+  // Load installed extensions on mount
+  useEffect(() => {
+    loadInstalledExtensions();
+  }, [loadInstalledExtensions]);
 
   useEffect(() => {
     if (activeTab === 'marketplace') {
       searchExtensions(searchQuery || '');
-    } else {
-      loadInstalledExtensions();
     }
-  }, [activeTab]);
+  }, [activeTab, searchQuery, searchExtensions]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -45,16 +51,34 @@ export function ExtensionsPanel() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, activeTab]);
 
+  // Filter installed extensions by search query
+  const filteredInstalledExtensions = activeTab === 'installed'
+    ? installedExtensions.filter(ext => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+          ext.name.toLowerCase().includes(query) ||
+          ext.description.toLowerCase().includes(query) ||
+          ext.publisher.toLowerCase().includes(query)
+        );
+      })
+    : [];
+
   const filteredExtensions = activeTab === 'installed'
-    ? installedExtensions
+    ? filteredInstalledExtensions
     : selectedCategory && selectedCategory !== 'All'
     ? extensions.filter(e => e.category === selectedCategory)
     : extensions;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="flex items-center border-b border-border px-4">
+    <div className="flex h-full relative">
+      {/* Left panel - List */}
+      <div className={cn(
+        'flex flex-col transition-all duration-200',
+        selectedExtensionId ? 'w-1/2 border-r border-border' : 'w-full'
+      )}>
+        {/* Tabs */}
+        <div className="flex items-center border-b border-border px-4">
         <button
           onClick={() => setActiveTab('marketplace')}
           className={cn(
@@ -87,22 +111,22 @@ export function ExtensionsPanel() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search Extensions in Marketplace"
+            placeholder={activeTab === 'installed' ? 'Search installed extensions...' : 'Search Extensions in Marketplace'}
             className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      {/* Category filter */}
+      {/* Category filter - Responsive with horizontal scroll */}
       {activeTab === 'marketplace' && (
-        <div className="px-4 py-2 border-b border-border overflow-x-auto">
-          <div className="flex gap-2">
+        <div className="px-4 py-2 border-b border-border overflow-x-auto scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent">
+          <div className="flex gap-2 min-w-max">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat === 'All' ? null : cat)}
                 className={cn(
-                  'px-3 py-1 text-xs rounded-md whitespace-nowrap transition-colors',
+                  'px-3 py-1 text-xs rounded-md whitespace-nowrap transition-colors flex-shrink-0',
                   (selectedCategory === null && cat === 'All') || selectedCategory === cat
                     ? 'bg-blue-500/20 text-blue-400'
                     : 'bg-card text-muted-foreground hover:bg-accent'
@@ -140,12 +164,21 @@ export function ExtensionsPanel() {
                   onUninstall={() => uninstallExtension(extension.id)}
                   onEnable={() => enableExtension(extension.id)}
                   onDisable={() => disableExtension(extension.id)}
+                  onClick={() => setSelectedExtensionId(extension.id)}
                 />
               ))}
             </AnimatePresence>
           </div>
         )}
       </ScrollArea>
+      </div>
+
+      {/* Right panel - Extension Detail View */}
+      {selectedExtensionId && (
+        <div className="w-1/2 flex flex-col">
+          <ExtensionDetailView />
+        </div>
+      )}
     </div>
   );
 }
@@ -157,6 +190,7 @@ interface ExtensionCardProps {
   onUninstall: () => void;
   onEnable: () => void;
   onDisable: () => void;
+  onClick: () => void;
 }
 
 function ExtensionCard({
@@ -166,13 +200,20 @@ function ExtensionCard({
   onUninstall,
   onEnable,
   onDisable,
+  onClick,
 }: ExtensionCardProps) {
   const [isInstalling, setIsInstalling] = useState(false);
 
-  const handleInstall = async () => {
+  const handleInstall = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsInstalling(true);
     await onInstall();
     setIsInstalling(false);
+  };
+
+  const handleActionClick = (e: React.MouseEvent, action: () => void) => {
+    e.stopPropagation();
+    action();
   };
 
   return (
@@ -180,7 +221,8 @@ function ExtensionCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="bg-card border border-border rounded-lg p-4 hover:bg-accent/50 transition-colors"
+      onClick={onClick}
+      className="bg-card border border-border rounded-lg p-4 hover:bg-accent/50 transition-colors cursor-pointer"
     >
       <div className="flex gap-4">
         {/* Icon placeholder */}
@@ -228,7 +270,7 @@ function ExtensionCard({
                 <>
                   {extension.enabled ? (
                     <button
-                      onClick={onDisable}
+                      onClick={(e) => handleActionClick(e, onDisable)}
                       className="px-3 py-1.5 text-xs bg-neutral-800 hover:bg-neutral-700 rounded transition-colors flex items-center gap-1.5"
                     >
                       <Settings className="w-3 h-3" />
@@ -236,7 +278,7 @@ function ExtensionCard({
                     </button>
                   ) : (
                     <button
-                      onClick={onEnable}
+                      onClick={(e) => handleActionClick(e, onEnable)}
                       className="px-3 py-1.5 text-xs bg-blue-500 hover:bg-blue-600 rounded transition-colors flex items-center gap-1.5"
                     >
                       <Check className="w-3 h-3" />
@@ -244,7 +286,7 @@ function ExtensionCard({
                     </button>
                   )}
                   <button
-                    onClick={onUninstall}
+                    onClick={(e) => handleActionClick(e, onUninstall)}
                     className="px-3 py-1.5 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors flex items-center gap-1.5"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -277,4 +319,6 @@ function ExtensionCard({
     </motion.div>
   );
 }
+
+
 
