@@ -8,6 +8,13 @@ mod utils;
 use commands::{filesystem, project};
 
 fn main() {
+    // Force native portal-based file dialogs on Linux (GNOME/KDE)
+    // This ensures we get the native file manager dialog instead of GTK's built-in one
+    #[cfg(target_os = "linux")]
+    {
+        std::env::set_var("GTK_USE_PORTAL", "1");
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -28,7 +35,3 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running DevBlitz");
 }
-
-
-
-
