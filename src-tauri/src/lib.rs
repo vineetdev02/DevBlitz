@@ -5,7 +5,7 @@ mod commands;
 mod security;
 mod utils;
 
-use commands::{filesystem, project, terminal};
+use commands::{fileops, filesystem, git, project, search, terminal};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -26,6 +26,27 @@ pub fn run() {
             filesystem::read_directory,
             filesystem::read_file_content,
             filesystem::get_file_info,
+            // File mutation commands
+            fileops::write_file,
+            fileops::create_file,
+            fileops::create_directory,
+            fileops::rename_path,
+            fileops::delete_path,
+            fileops::copy_path,
+            fileops::reveal_in_file_manager,
+            // Search commands
+            search::list_project_files,
+            search::search_in_files,
+            search::replace_in_file,
+            // Git commands
+            git::git_info,
+            git::git_status,
+            git::git_stage,
+            git::git_unstage,
+            git::git_discard,
+            git::git_commit,
+            git::git_diff,
+            git::git_log,
             // Project commands
             project::select_folder,
             project::get_recent_projects,

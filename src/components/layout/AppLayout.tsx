@@ -4,31 +4,41 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Titlebar } from './Titlebar';
 import { Sidebar } from './Sidebar';
+import { ActivityBar } from './ActivityBar';
 import { StatusBar } from './StatusBar';
-import { useSidebarVisible } from '@/stores/appStore';
+import { Toaster } from '@/components/ui/toast';
+import { CommandPalette } from '@/components/command/CommandPalette';
+import { useSidebarVisible, useZenMode } from '@/stores/appStore';
 
 interface AppLayoutProps {
   children: React.ReactNode;
   className?: string;
-  onOpenSettings?: () => void;
 }
 
-export function AppLayout({ children, className, onOpenSettings }: AppLayoutProps) {
+/**
+ * The IDE shell: title bar, activity rail, side bar, editor area, status bar.
+ * Zen mode strips everything but the editor.
+ */
+export function AppLayout({ children, className }: AppLayoutProps) {
   const isSidebarVisible = useSidebarVisible();
+  const isZenMode = useZenMode();
 
   return (
-    <div className={cn('flex flex-col h-screen bg-background', className)}>
-      <Titlebar />
+    <div className={cn('flex h-screen flex-col overflow-hidden bg-black', className)}>
+      {!isZenMode && <Titlebar />}
 
-      <div className="flex flex-1 overflow-hidden">
-        {isSidebarVisible && <Sidebar onOpenSettings={onOpenSettings} />}
+      <div className="flex min-h-0 flex-1">
+        {!isZenMode && <ActivityBar />}
+        {!isZenMode && isSidebarVisible && <Sidebar />}
 
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {children}
-        </main>
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</main>
       </div>
 
-      <StatusBar />
+      {!isZenMode && <StatusBar />}
+
+      {/* Overlays live above every panel */}
+      <CommandPalette />
+      <Toaster />
     </div>
   );
 }

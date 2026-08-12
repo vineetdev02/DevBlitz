@@ -30,6 +30,7 @@ interface ProjectState {
   setFileTree: (tree: FileTreeNode[]) => void;
   toggleExpanded: (path: string) => void;
   setExpanded: (path: string, expanded: boolean) => void;
+  collapseAll: () => void;
   setSelectedPath: (path: string | null) => void;
   setRecentProjects: (projects: RecentProject[]) => void;
   updateSettings: (settings: Partial<ProjectSettings>) => void;
@@ -83,6 +84,10 @@ export const useProjectStore = create<ProjectState>()(
           expandedPaths.delete(path);
         }
         set({ expandedPaths });
+      },
+
+      collapseAll: () => {
+        set({ expandedPaths: new Set<string>() });
       },
 
       setSelectedPath: (path) => {

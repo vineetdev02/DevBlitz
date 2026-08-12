@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { WelcomeScreen } from '@/components/welcome';
-import { useProject, useGlobalShortcuts } from '@/hooks';
+import { useProject } from '@/hooks';
 import { useCurrentProject } from '@/stores/projectStore';
 
 /**
@@ -16,10 +16,18 @@ export default function HomePage() {
   const currentProject = useCurrentProject();
   const { openProject, isLoading } = useProject();
 
-  // Register global keyboard shortcuts
-  useGlobalShortcuts({
-    onOpenFolder: openProject,
-  });
+  // The welcome screen only needs one shortcut; the IDE registers the rest.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        void openProject();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openProject]);
 
   // Redirect to IDE if project is open
   useEffect(() => {

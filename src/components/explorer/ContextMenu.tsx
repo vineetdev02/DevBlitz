@@ -2,14 +2,14 @@
 
 import React from 'react';
 import {
-  Copy,
   Clipboard,
-  Trash2,
-  Pencil,
-  FolderPlus,
-  FilePlus,
+  Copy,
   ExternalLink,
-  Eye,
+  FilePlus,
+  FolderPlus,
+  Pencil,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -20,69 +20,41 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
+  ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { getModifierKey } from '@/lib/utils';
+import { useFileOperations } from '@/hooks/useFileOperations';
+import { useExplorerStore } from '@/stores/explorerStore';
+import { useProjectStore } from '@/stores/projectStore';
 import type { FileTreeNode } from '@/types';
 
 interface FileContextMenuProps {
   node: FileTreeNode;
   children: React.ReactNode;
+  onOpen?: () => void;
 }
 
-/**
- * Context menu for file tree items
- * Provides file operations like copy, rename, delete
- */
-export function FileContextMenu({ node, children }: FileContextMenuProps) {
-  const modKey = getModifierKey();
+/** Right-click menu for file tree items. Every entry is wired to a real action. */
+export function FileContextMenu({ node, children, onOpen }: FileContextMenuProps) {
+  const { reveal, refreshDirectory, copyRelativePath, copyAbsolutePath } = useFileOperations();
+  const { startCreate, startRename, requestDelete } = useExplorerStore();
+  const { expandedPaths, toggleExpanded } = useProjectStore();
 
-  const handleCopyPath = () => {
-    navigator.clipboard.writeText(node.path);
-  };
+  // New entries go inside a folder, or beside a file.
+  const targetDirectory = node.isDirectory ? node.path : parentOf(node.path);
 
-  const handleCopyRelativePath = () => {
-    // TODO: Calculate relative path from project root
-    const relativePath = node.name;
-    navigator.clipboard.writeText(relativePath);
-  };
-
-  const handleRevealInFinder = async () => {
-    // TODO: Implement with Tauri shell
-    console.log('Reveal in finder:', node.path);
-  };
-
-  const handleRename = () => {
-    // TODO: Implement rename functionality
-    console.log('Rename:', node.path);
-  };
-
-  const handleDelete = () => {
-    // TODO: Implement delete functionality
-    console.log('Delete:', node.path);
-  };
-
-  const handleNewFile = () => {
-    // TODO: Implement new file in directory
-    console.log('New file in:', node.path);
-  };
-
-  const handleNewFolder = () => {
-    // TODO: Implement new folder in directory
-    console.log('New folder in:', node.path);
+  const handleCreate = (kind: 'file' | 'folder') => {
+    if (node.isDirectory && !expandedPaths.has(node.path)) toggleExpanded(node.path);
+    startCreate(targetDirectory, kind);
   };
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        {children}
-      </ContextMenuTrigger>
-      
-      <ContextMenuContent className="w-56">
-        {/* File operations */}
-        {!node.isDirectory && (
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+
+      <ContextMenuContent className="w-60">
+        {!node.isDirectory && onOpen && (
           <>
-            <ContextMenuItem onClick={() => console.log('Open:', node.path)}>
-              <Eye className="w-4 h-4 mr-2" />
+            <ContextMenuItem onClick={onOpen}>
               Open
               <ContextMenuShortcut>Enter</ContextMenuShortcut>
             </ContextMenuItem>
@@ -90,74 +62,70 @@ export function FileContextMenu({ node, children }: FileContextMenuProps) {
           </>
         )}
 
-        {/* Directory operations */}
+        <ContextMenuItem onClick={() => handleCreate('file')}>
+          <FilePlus className="mr-2 h-4 w-4" />
+          New File
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => handleCreate('folder')}>
+          <FolderPlus className="mr-2 h-4 w-4" />
+          New Folder
+        </ContextMenuItem>
+
         {node.isDirectory && (
-          <>
-            <ContextMenuItem onClick={handleNewFile}>
-              <FilePlus className="w-4 h-4 mr-2" />
-              New File
-              <ContextMenuShortcut>{modKey}+N</ContextMenuShortcut>
-            </ContextMenuItem>
-            <ContextMenuItem onClick={handleNewFolder}>
-              <FolderPlus className="w-4 h-4 mr-2" />
-              New Folder
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-          </>
+          <ContextMenuItem onClick={() => refreshDirectory(node.path)}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </ContextMenuItem>
         )}
 
-        {/* Copy operations */}
+        <ContextMenuSeparator />
+
         <ContextMenuSub>
           <ContextMenuSubTrigger>
-            <Copy className="w-4 h-4 mr-2" />
+            <Copy className="mr-2 h-4 w-4" />
             Copy
           </ContextMenuSubTrigger>
           <ContextMenuSubContent>
-            <ContextMenuItem onClick={handleCopyPath}>
-              <Clipboard className="w-4 h-4 mr-2" />
+            <ContextMenuItem onClick={() => copyAbsolutePath(node.path)}>
+              <Clipboard className="mr-2 h-4 w-4" />
               Copy Path
             </ContextMenuItem>
-            <ContextMenuItem onClick={handleCopyRelativePath}>
-              <Clipboard className="w-4 h-4 mr-2" />
+            <ContextMenuItem onClick={() => copyRelativePath(node.path)}>
+              <Clipboard className="mr-2 h-4 w-4" />
               Copy Relative Path
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
 
-        <ContextMenuSeparator />
-
-        {/* Reveal in system */}
-        <ContextMenuItem onClick={handleRevealInFinder}>
-          <ExternalLink className="w-4 h-4 mr-2" />
+        <ContextMenuItem onClick={() => reveal(node.path)}>
+          <ExternalLink className="mr-2 h-4 w-4" />
           Reveal in File Manager
         </ContextMenuItem>
 
         <ContextMenuSeparator />
 
-        {/* Edit operations */}
-        <ContextMenuItem onClick={handleRename}>
-          <Pencil className="w-4 h-4 mr-2" />
+        <ContextMenuItem onClick={() => startRename(node.path)}>
+          <Pencil className="mr-2 h-4 w-4" />
           Rename
           <ContextMenuShortcut>F2</ContextMenuShortcut>
         </ContextMenuItem>
 
         <ContextMenuItem
-          onClick={handleDelete}
-          className="text-destructive focus:text-destructive"
+          onClick={() => requestDelete(node.path)}
+          className="text-red-400 focus:bg-red-500/10 focus:text-red-300"
         >
-          <Trash2 className="w-4 h-4 mr-2" />
+          <Trash2 className="mr-2 h-4 w-4" />
           Delete
-          <ContextMenuShortcut>Delete</ContextMenuShortcut>
+          <ContextMenuShortcut>Del</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );
 }
 
-// Re-export trigger for convenience
-import { ContextMenuTrigger } from '@/components/ui/context-menu';
+function parentOf(path: string): string {
+  const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return index <= 0 ? path : path.slice(0, index);
+}
+
 export { ContextMenuTrigger };
-
-
-
-

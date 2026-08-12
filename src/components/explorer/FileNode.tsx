@@ -3,32 +3,52 @@
 import React, { memo, useCallback } from 'react';
 import {
   ChevronRight,
-  Folder,
-  FolderOpen,
+  Database,
   File,
   FileCode,
   FileJson,
   FileText,
-  Image,
-  Settings,
   FileType,
-  Database,
-  Terminal,
+  Folder,
+  FolderOpen,
   GitBranch,
-  Package,
+  Image,
   Loader2,
+  Package,
+  Settings,
+  Terminal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FileContextMenu } from './ContextMenu';
 import { useEditorStore, getLanguageFromExtension } from '@/stores/editorStore';
-import { useCurrentProject } from '@/stores/projectStore';
-import { readFileContent } from '@/lib/tauri-commands';
+import { useExplorerStore } from '@/stores/explorerStore';
+import { RenameRow } from './EditRows';
 import type { FileTreeNode } from '@/types';
+
+/** Colors matching git's own vocabulary for changed files. */
+const GIT_STATUS_STYLES: Record<string, string> = {
+  modified: 'text-amber-400',
+  added: 'text-emerald-400',
+  untracked: 'text-emerald-400',
+  deleted: 'text-red-400',
+  renamed: 'text-blue-400',
+  conflicted: 'text-red-400',
+};
+
+const GIT_STATUS_LETTERS: Record<string, string> = {
+  modified: 'M',
+  added: 'A',
+  untracked: 'U',
+  deleted: 'D',
+  renamed: 'R',
+  conflicted: '!',
+};
 
 interface FileNodeProps {
   node: FileTreeNode;
   isExpanded: boolean;
   isSelected: boolean;
+  gitStatus?: string;
   onToggle: () => void;
   onSelect: () => void;
 }
@@ -37,101 +57,107 @@ export const FileNode = memo(function FileNode({
   node,
   isExpanded,
   isSelected,
+  gitStatus,
   onToggle,
   onSelect,
 }: FileNodeProps) {
   const Icon = getFileIcon(node, isExpanded);
   const iconColor = getIconColor(node);
-  const { openFile } = useEditorStore();
-  const currentProject = useCurrentProject();
+
+  const openFileFromDisk = useEditorStore((state) => state.openFileFromDisk);
+  const isDirty = useEditorStore((state) =>
+    state.openFiles.some((f) => f.path === node.path && f.isModified)
+  );
+  const isOpenInEditor = useEditorStore((state) =>
+    state.openFiles.some((f) => f.path === node.path)
+  );
+
+  const renamingPath = useExplorerStore((state) => state.renamingPath);
+  const isRenaming = renamingPath === node.path;
 
   // VS Code style indent: 8px base + 12px per level
   const indent = 8 + node.depth * 12;
 
-  const handleOpenFile = useCallback(async () => {
-    if (node.isDirectory || !currentProject) return;
-
-    try {
-      const content = await readFileContent(node.path, currentProject.path);
-      openFile({
-        path: node.path,
-        name: node.name,
-        content: content || '',
-        language: getLanguageFromExtension(node.extension),
-      });
-    } catch (err) {
-      console.error('Failed to open file:', err);
-      openFile({
-        path: node.path,
-        name: node.name,
-        content: `// Error: ${err instanceof Error ? err.message : 'Failed to load'}`,
-        language: 'plaintext',
-      });
-    }
-  }, [node, currentProject, openFile]);
+  const handleOpenFile = useCallback(() => {
+    if (node.isDirectory) return;
+    void openFileFromDisk(node.path, node.name, getLanguageFromExtension(node.extension));
+  }, [node, openFileFromDisk]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect();
-    
-    if (node.isDirectory) {
-      onToggle();
-    } else {
-      handleOpenFile();
-    }
+
+    if (node.isDirectory) onToggle();
+    else handleOpenFile();
   };
 
+  // Rendered by a dedicated component so ordinary nodes never subscribe to the
+  // file-operation hooks.
+  if (isRenaming) return <RenameRow node={node} indent={indent + 20} />;
+
+  const statusColor = gitStatus ? GIT_STATUS_STYLES[gitStatus] : undefined;
+
   return (
-    <FileContextMenu node={node}>
+    <FileContextMenu node={node} onOpen={handleOpenFile}>
       <div
         role="treeitem"
         aria-expanded={node.isDirectory ? isExpanded : undefined}
         aria-selected={isSelected}
         className={cn(
-          'relative flex items-center h-[22px] cursor-pointer',
-          'hover:bg-white/5 transition-colors duration-75',
-          'text-[13px] select-none',
-          isSelected && 'bg-white/10',
+          'group relative flex h-[22px] cursor-pointer items-center pr-2',
+          'text-[13px] transition-colors duration-75 hover:bg-white/[0.06]',
+          isSelected && 'bg-white/[0.09]',
+          isOpenInEditor && !isSelected && 'text-neutral-200'
         )}
         style={{ paddingLeft: `${indent}px` }}
         onClick={handleClick}
       >
-        {/* Indent guide lines */}
-        {node.depth > 0 && (
-          <>
-            {Array.from({ length: node.depth }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute top-0 bottom-0 w-px bg-neutral-800"
-                style={{ left: `${16 + i * 12}px` }}
-              />
-            ))}
-          </>
-        )}
+        {/* Indent guides */}
+        {node.depth > 0 &&
+          Array.from({ length: node.depth }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute bottom-0 top-0 w-px bg-white/[0.06]"
+              style={{ left: `${16 + i * 12}px` }}
+            />
+          ))}
 
-        {/* Chevron for directories */}
-        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 mr-0.5">
-          {node.isDirectory && (
-            node.isLoading ? (
-              <Loader2 className="w-3 h-3 animate-spin text-neutral-500" />
+        <span className="mr-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center">
+          {node.isDirectory &&
+            (node.isLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin text-neutral-500" />
             ) : (
               <ChevronRight
                 className={cn(
-                  'w-3 h-3 text-neutral-500 transition-transform duration-100',
+                  'h-3 w-3 text-neutral-500 transition-transform duration-100',
                   isExpanded && 'rotate-90'
                 )}
               />
-            )
-          )}
+            ))}
         </span>
 
-        {/* Icon */}
-        <Icon className={cn('w-4 h-4 mr-1.5 flex-shrink-0', iconColor)} />
+        <Icon className={cn('mr-1.5 h-4 w-4 flex-shrink-0', statusColor ?? iconColor)} />
 
-        {/* Name */}
-        <span className={cn('truncate', node.isHidden && 'opacity-50')}>
+        <span
+          className={cn(
+            'truncate',
+            node.isHidden && 'opacity-50',
+            statusColor,
+            gitStatus === 'deleted' && 'line-through'
+          )}
+        >
           {node.name}
         </span>
+
+        {/* Unsaved indicator */}
+        {isDirty && <span className="ml-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-white" />}
+
+        {/* Git status letter */}
+        {gitStatus && (
+          <span className={cn('ml-auto flex-shrink-0 pl-2 text-[11px] font-semibold', statusColor)}>
+            {GIT_STATUS_LETTERS[gitStatus] ?? 'M'}
+          </span>
+        )}
       </div>
     </FileContextMenu>
   );
@@ -165,7 +191,7 @@ function getIconColor(node: FileTreeNode): string {
     const name = node.name.toLowerCase();
     if (name === 'node_modules') return 'text-green-500/70';
     if (name === '.git') return 'text-orange-400';
-    return 'text-yellow-500';
+    return 'text-neutral-400';
   }
 
   const ext = node.extension?.toLowerCase();

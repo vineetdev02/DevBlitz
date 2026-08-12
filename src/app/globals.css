@@ -21,9 +21,9 @@
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 0 0% 80%;
+    --border: 0 0% 13%;
+    --input: 0 0% 13%;
+    --ring: 213 94% 60%;
     --radius: 0.5rem;
 
     /* Custom DevBlitz variables */
@@ -69,10 +69,10 @@
     -webkit-user-select: none;
   }
 
-  /* Custom scrollbar */
+  /* Scrollbars: thin, dim, and only obvious on hover - like a real editor */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
@@ -80,12 +80,25 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.11);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 6px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
+    background: rgba(255, 255, 255, 0.22);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: rgba(255, 255, 255, 0.3);
+    background-clip: content-box;
+  }
+
+  /* Both scrollbars meeting in the corner should not paint a grey box */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   /* Hide scrollbar for specific elements */
@@ -283,3 +296,43 @@
 }
 
 
+
+
+/* --- Editor chrome ------------------------------------------------------ */
+
+/* The editor renders its own selection colour; the browser default fights it */
+::selection {
+  background: rgba(38, 79, 120, 0.7);
+}
+
+/* Focus rings only when navigating by keyboard, never on mouse clicks */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role='treeitem']:focus-visible {
+  outline: 1px solid hsl(var(--ring));
+  outline-offset: -1px;
+}
+
+/* Framer Motion's Reorder items must not inherit a list marker */
+[data-framer-portal-id],
+li {
+  list-style: none;
+}
+
+/* Native controls inside the dark chrome */
+input,
+textarea {
+  color-scheme: dark;
+}
+
+/* Stop the whole app from being drag-selectable while resizing panels */
+body.is-resizing,
+body.is-resizing * {
+  user-select: none !important;
+  cursor: col-resize !important;
+}

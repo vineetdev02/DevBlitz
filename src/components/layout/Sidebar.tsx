@@ -1,67 +1,77 @@
 'use client';
 
-import React, { useCallback, useRef, useEffect } from 'react';
-import { Files, Search, GitBranch, Settings, ChevronLeft, Terminal, Package } from 'lucide-react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import {
+  ChevronsDownUp,
+  FilePlus,
+  FolderPlus,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppStore, useSidebarWidth, useSidebarVisible } from '@/stores/appStore';
-import { useTerminalStore } from '@/stores/terminalStore';
-import { useCurrentProject } from '@/stores/projectStore';
-import { SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } from '@/lib/constants';
+import { useActivePanel, useAppStore, useSidebarWidth } from '@/stores/appStore';
+import { useCurrentProject, useProjectStore } from '@/stores/projectStore';
+import { useExplorerStore } from '@/stores/explorerStore';
+import { useGitStore } from '@/stores/gitStore';
+import { useFileOperations } from '@/hooks/useFileOperations';
+import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH } from '@/lib/constants';
 import { FileTree } from '@/components/explorer/FileTree';
 import { SearchPanel } from '@/components/search/SearchPanel';
 import { ExtensionsPanel } from '@/components/extensions';
+import { GitPanel } from '@/components/git/GitPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-type SidebarTab = 'explorer' | 'search' | 'git' | 'extensions';
+const PANEL_TITLES = {
+  explorer: 'Explorer',
+  search: 'Search',
+  git: 'Source Control',
+  extensions: 'Extensions',
+} as const;
 
-interface SidebarProps {
-  className?: string;
-  onOpenSettings?: () => void;
-}
-
-export function Sidebar({ className, onOpenSettings }: SidebarProps) {
+/**
+ * The side bar content area. The icon rail lives in ActivityBar so it survives
+ * the side bar being collapsed.
+ */
+export function Sidebar({ className }: { className?: string }) {
   const sidebarWidth = useSidebarWidth();
-  const isSidebarVisible = useSidebarVisible();
-  const { setSidebarWidth, setSidebarResizing, toggleSidebar } = useAppStore();
-  const { toggleTerminal, isTerminalOpen, createTerminal } = useTerminalStore();
+  const activePanel = useActivePanel();
+  const { setSidebarWidth, setSidebarResizing } = useAppStore();
+
   const currentProject = useCurrentProject();
-  
-  const [activeTab, setActiveTab] = React.useState<SidebarTab>('explorer');
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  const { isLoadingTree, collapseAll } = useProjectStore();
+  const { startCreate } = useExplorerStore();
+  const { refreshDirectory } = useFileOperations();
+
+  const gitRefresh = useGitStore((state) => state.refresh);
+  const isGitRefreshing = useGitStore((state) => state.isRefreshing);
+
   const isResizing = useRef(false);
 
-  const handleToggleTerminal = () => {
-    if (!isTerminalOpen) {
-      // Create terminal if none exists
-      const cwd = currentProject?.path || '/';
-      createTerminal(cwd);
-    }
-    toggleTerminal();
-  };
-
-  const startResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    setSidebarResizing(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, [setSidebarResizing]);
+  const startResize = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+      setSidebarResizing(true);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [setSidebarResizing]
+  );
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing.current) return;
-      const newWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, e.clientX));
-      setSidebarWidth(newWidth);
+      // The 48px activity bar sits to the left of the panel.
+      const width = e.clientX - 48;
+      setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width)));
     };
 
     const handleMouseUp = () => {
-      if (isResizing.current) {
-        isResizing.current = false;
-        setSidebarResizing(false);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      setSidebarResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -72,136 +82,92 @@ export function Sidebar({ className, onOpenSettings }: SidebarProps) {
     };
   }, [setSidebarWidth, setSidebarResizing]);
 
-  if (!isSidebarVisible) return null;
-
-  const tabs: { id: SidebarTab; icon: React.ComponentType<{ className?: string }>; label: string }[] = [
-    { id: 'explorer', icon: Files, label: 'Explorer' },
-    { id: 'search', icon: Search, label: 'Search' },
-    { id: 'git', icon: GitBranch, label: 'Source Control' },
-    { id: 'extensions', icon: Package, label: 'Extensions' },
-  ];
-
   return (
-    <TooltipProvider delayDuration={300}>
-      <aside
-        ref={sidebarRef}
-        className={cn('relative flex h-full bg-background border-r border-border', className)}
-        style={{ width: sidebarWidth }}
-      >
-        {/* Activity bar */}
-        <div className="flex flex-col items-center w-12 py-2 border-r border-border bg-card/50">
-          {tabs.map((tab) => (
-            <Tooltip key={tab.id}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    'flex items-center justify-center w-10 h-10 rounded-md mb-1',
-                    'transition-colors duration-150',
-                    activeTab === tab.id
-                      ? 'bg-accent text-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-                  )}
-                >
-                  <tab.icon className="w-5 h-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">{tab.label}</TooltipContent>
-            </Tooltip>
-          ))}
+    <aside
+      className={cn('relative flex h-full flex-col border-r border-white/[0.06] bg-[#0a0a0a]', className)}
+      style={{ width: sidebarWidth }}
+    >
+      {/* Panel header with contextual actions */}
+      <div className="group flex h-9 flex-shrink-0 items-center justify-between border-b border-white/[0.06] pl-4 pr-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+          {PANEL_TITLES[activePanel]}
+        </span>
 
-          <div className="flex-1" />
-
-          {/* Terminal toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={handleToggleTerminal}
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 rounded-md mb-1',
-                  'transition-colors duration-150',
-                  isTerminalOpen
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+        <div className="flex items-center gap-0.5">
+          {activePanel === 'explorer' && currentProject && (
+            <>
+              <HeaderButton label="New File" onClick={() => startCreate(null, 'file')}>
+                <FilePlus className="h-4 w-4" />
+              </HeaderButton>
+              <HeaderButton label="New Folder" onClick={() => startCreate(null, 'folder')}>
+                <FolderPlus className="h-4 w-4" />
+              </HeaderButton>
+              <HeaderButton label="Refresh Explorer" onClick={() => void refreshDirectory(null)}>
+                {isLoadingTree ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
                 )}
-              >
-                <Terminal className="w-5 h-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Terminal (Ctrl+`)</TooltipContent>
-          </Tooltip>
-
-          {/* Settings */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onOpenSettings}
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 rounded-md mb-1',
-                  'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                  'transition-colors duration-150'
-                )}
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Settings (Ctrl+,)</TooltipContent>
-          </Tooltip>
-
-          {/* Collapse */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={toggleSidebar}
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 rounded-md',
-                  'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                  'transition-colors duration-150'
-                )}
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Collapse Sidebar (Ctrl+B)</TooltipContent>
-          </Tooltip>
-        </div>
-
-        {/* Panel content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center h-9 px-4 border-b border-border">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {tabs.find((t) => t.id === activeTab)?.label}
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {activeTab === 'explorer' && (
-              <ScrollArea className="h-full">
-                <FileTree />
-              </ScrollArea>
-            )}
-            {activeTab === 'search' && <SearchPanel />}
-            {activeTab === 'git' && (
-              <div className="flex flex-col items-center justify-center h-48 p-4 text-muted-foreground">
-                <GitBranch className="w-8 h-8 mb-3 opacity-50" />
-                <p className="text-sm">Source Control</p>
-                <p className="text-xs mt-1 opacity-60">Coming soon...</p>
-              </div>
-            )}
-            {activeTab === 'extensions' && <ExtensionsPanel />}
-          </div>
-        </div>
-
-        {/* Resize handle */}
-        <div
-          className={cn(
-            'absolute right-0 top-0 w-1 h-full cursor-col-resize',
-            'hover:bg-ring/50 transition-colors duration-150',
-            'active:bg-ring'
+              </HeaderButton>
+              <HeaderButton label="Collapse Folders" onClick={collapseAll}>
+                <ChevronsDownUp className="h-4 w-4" />
+              </HeaderButton>
+            </>
           )}
-          onMouseDown={startResize}
-        />
-      </aside>
-    </TooltipProvider>
+
+          {activePanel === 'git' && currentProject && (
+            <HeaderButton
+              label="Refresh"
+              onClick={() => void gitRefresh(currentProject.path)}
+            >
+              {isGitRefreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </HeaderButton>
+          )}
+        </div>
+      </div>
+
+      {/* Panel body */}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {activePanel === 'explorer' && (
+          <ScrollArea className="h-full">
+            <FileTree />
+          </ScrollArea>
+        )}
+        {activePanel === 'search' && <SearchPanel />}
+        {activePanel === 'git' && <GitPanel />}
+        {activePanel === 'extensions' && <ExtensionsPanel />}
+      </div>
+
+      {/* Resize handle */}
+      <div
+        onMouseDown={startResize}
+        className="absolute -right-0.5 top-0 z-20 h-full w-1.5 cursor-col-resize transition-colors hover:bg-blue-500/60"
+      />
+    </aside>
+  );
+}
+
+function HeaderButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
+    >
+      {children}
+    </button>
   );
 }

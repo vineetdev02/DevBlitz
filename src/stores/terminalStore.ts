@@ -61,7 +61,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     
     let newActiveId = activeTerminalId;
     if (activeTerminalId === id) {
-      newActiveId = newTerminals.length > 0 ? newTerminals[newTerminals.length - 1].id : null;
+      newActiveId = newTerminals[newTerminals.length - 1]?.id ?? null;
     }
 
     set({

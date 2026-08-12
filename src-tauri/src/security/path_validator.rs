@@ -84,36 +84,80 @@ pub fn validate_path(base_path: &Path, requested_path: &Path) -> Result<PathBuf,
     Ok(canonical_requested)
 }
 
+/// Windows reserved device names. These are only dangerous when they make up an
+/// entire path component (or its stem) - never as a substring.
+const RESERVED_DEVICE_NAMES: [&str; 22] = [
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
 /// Check for forbidden patterns in path strings
-/// 
+///
 /// # Arguments
 /// * `path` - The path string to check
-/// 
+///
 /// # Returns
 /// * `true` if the path contains forbidden patterns
 /// * `false` if the path appears safe
+///
+/// # Note
+/// Device names are matched per path component, not as substrings. A substring
+/// match would reject perfectly ordinary paths such as `src/lib/constants.ts`
+/// ("CON"), `app/nullable.rs` ("NUL") or `auxiliary/` ("AUX").
 fn contains_forbidden_patterns(path: &str) -> bool {
-    // List of patterns that indicate potential attacks
-    let forbidden_patterns = [
-        // Null bytes (can truncate paths in some systems)
-        "\0",
-        // Windows alternate data streams
-        "::$DATA",
-        // Device names (Windows)
-        "CON", "PRN", "AUX", "NUL",
-        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
-    ];
+    // Null bytes can truncate paths in some systems
+    if path.contains('\0') {
+        return true;
+    }
 
-    let path_upper = path.to_uppercase();
-    
-    for pattern in &forbidden_patterns {
-        if path_upper.contains(pattern) {
+    // Windows alternate data streams
+    if path.to_uppercase().contains("::$DATA") {
+        return true;
+    }
+
+    // Reserved device names, checked component-by-component
+    for component in path.split(['/', '\\']) {
+        let stem = component.split('.').next().unwrap_or("").to_uppercase();
+        if RESERVED_DEVICE_NAMES.contains(&stem.as_str()) {
             return true;
         }
     }
 
     false
+}
+
+/// Validate a path that does not exist yet (for create / rename / save-as).
+///
+/// The target itself cannot be canonicalized, so its *parent* is validated
+/// against the base instead, and the final component is checked for safety.
+///
+/// # Returns
+/// * `Ok(PathBuf)` - the absolute path the caller may write to
+/// * `Err(String)` - if the parent escapes the base or the name is unsafe
+pub fn validate_new_path(base_path: &Path, requested_path: &Path) -> Result<PathBuf, String> {
+    let path_str = requested_path.to_string_lossy();
+    if contains_forbidden_patterns(&path_str) {
+        return Err(PathSecurityError::ForbiddenPattern.to_string());
+    }
+
+    let file_name = requested_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| PathSecurityError::InvalidRequestedPath.to_string())?;
+
+    if !is_safe_filename(file_name) {
+        return Err(format!("Invalid name: {}", file_name));
+    }
+
+    let parent = requested_path
+        .parent()
+        .ok_or_else(|| PathSecurityError::InvalidRequestedPath.to_string())?;
+
+    // The parent must exist and live inside the project boundary
+    let canonical_parent = validate_path(base_path, parent)?;
+
+    Ok(canonical_parent.join(file_name))
 }
 
 /// Validate that a filename is safe
@@ -200,7 +244,19 @@ mod tests {
     fn test_forbidden_patterns() {
         assert!(contains_forbidden_patterns("file\0name"));
         assert!(contains_forbidden_patterns("file::$DATA"));
+        assert!(contains_forbidden_patterns("/project/CON"));
+        assert!(contains_forbidden_patterns("/project/nul.txt"));
         assert!(!contains_forbidden_patterns("normal_file.txt"));
+    }
+
+    #[test]
+    fn test_device_names_only_match_whole_components() {
+        // Regression: these were all rejected when matching was substring-based
+        assert!(!contains_forbidden_patterns("/project/src/lib/constants.ts"));
+        assert!(!contains_forbidden_patterns("/project/src/auxiliary/mod.rs"));
+        assert!(!contains_forbidden_patterns("/project/nullable.rs"));
+        assert!(!contains_forbidden_patterns("/project/components/Console.tsx"));
+        assert!(!contains_forbidden_patterns("/project/prnt/lpt10.rs"));
     }
 }
 

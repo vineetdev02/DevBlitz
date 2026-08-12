@@ -383,10 +383,17 @@ export const useExtensionsStore = create<ExtensionsState>((set, get) => ({
   },
 }));
 
-// Persist installed extensions to localStorage
+// Persist installed extensions to localStorage.
+// Plain subscribe fires on every change, so compare against the previous value
+// ourselves rather than pulling in the subscribeWithSelector middleware.
+let lastPersistedExtensions = useExtensionsStore.getState().installedExtensions;
+
 useExtensionsStore.subscribe(
-  (state) => state.installedExtensions,
-  (installedExtensions) => {
+  (state) => {
+    const { installedExtensions } = state;
+    if (installedExtensions === lastPersistedExtensions) return;
+    lastPersistedExtensions = installedExtensions;
+
     try {
       localStorage.setItem('devblitz-installed-extensions', JSON.stringify(installedExtensions));
     } catch (error) {
